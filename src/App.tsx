@@ -1,13 +1,8 @@
-import {
-  faRedo,
-  faSave,
-  faStop,
-  faVideo,
-} from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import React from "react";
+import { Dialog, Transition } from "@headlessui/react";
+import React, { Fragment } from "react";
 import { Helmet } from "react-helmet";
 import Webcam from "react-webcam";
+import Controls from "./components/Controls";
 
 function App() {
   const webcamRef = React.useRef<any>(null);
@@ -15,19 +10,12 @@ function App() {
   const [capturing, setCapturing] = React.useState(false);
   const [recordedChunks, setRecordedChunks] = React.useState([]);
   const [timeRecording, setTimeRecording] = React.useState(0);
+  const [isPaused, setIsPaused] = React.useState(false);
+  const [openPreview, setOpenPreview] = React.useState(false);
+  const [videoUrl, setVideoUrl] = React.useState("");
   const increment = React.useRef<any>(null);
 
-  const handleStart = () => {
-    setCapturing(true);
-    increment.current = setInterval(() => {
-      setTimeRecording((timer) => timer + 1);
-    }, 1000);
-  };
-
-  const handleReset = () => {
-    clearInterval(increment.current);
-    setTimeRecording(0);
-  };
+  const isDoneRecording = !capturing && recordedChunks.length !== 0;
 
   const handleDataAvailable = React.useCallback(
     ({ data }) => {
@@ -65,13 +53,30 @@ function App() {
     setCapturing(false);
   }, [mediaRecorderRef, setCapturing]);
 
-  const handleDownload = React.useCallback(() => {
+  const handlePauseCaptureClick = React.useCallback(() => {
+    mediaRecorderRef.current.pause();
+    clearInterval(increment.current);
+    setCapturing(false);
+    setIsPaused(true);
+  }, [mediaRecorderRef, setIsPaused, setCapturing]);
+
+  const handleResumeCaptureClick = React.useCallback(() => {
+    mediaRecorderRef.current.resume();
+    setCapturing(true);
+    setIsPaused(false);
+    increment.current = setInterval(() => {
+      setTimeRecording((timer) => timer + 1);
+    }, 1000);
+  }, [mediaRecorderRef, setIsPaused, setCapturing]);
+
+  const handleUpload = React.useCallback(() => {
     setTimeRecording(0);
     if (recordedChunks.length) {
       const blob = new Blob(recordedChunks, {
         type: "video/webm",
       });
       const url = URL.createObjectURL(blob);
+      setVideoUrl(url);
       const a = document.createElement("a");
       document.body.appendChild(a);
       a.setAttribute("style", "display: none");
@@ -80,64 +85,29 @@ function App() {
       a.click();
       window.URL.revokeObjectURL(url);
       setRecordedChunks([]);
+      setIsPaused(false);
+    }
+  }, [recordedChunks]);
+
+  const handlePreview = React.useCallback(() => {
+    if (recordedChunks.length) {
+      const blob = new Blob(recordedChunks, {
+        type: "video/webm",
+      });
+      const url = URL.createObjectURL(blob);
+      setVideoUrl(url);
+      setOpenPreview(true);
     }
   }, [recordedChunks]);
 
   const handleResetCaptureClick = React.useCallback(() => {
     setTimeRecording(0);
+    setIsPaused(false);
+    setVideoUrl("");
     if (recordedChunks.length) {
       setRecordedChunks([]);
     }
   }, [recordedChunks]);
-
-  const RecordButton = ({
-    capturing,
-    download,
-  }: {
-    capturing: boolean;
-    download: boolean;
-  }) => {
-    if (download) {
-      return (
-        <button onClick={handleDownload}>
-          <div className="h-16 w-16 bg-red-500 rounded-full text-white text-2xl flex justify-center items-center">
-            <FontAwesomeIcon icon={faSave} />
-          </div>
-        </button>
-      );
-    }
-
-    if (capturing) {
-      return (
-        <button onClick={handleStopCaptureClick}>
-          <div className="h-16 w-16 bg-red-500 rounded-full text-white text-2xl flex justify-center items-center">
-            <FontAwesomeIcon icon={faStop} />
-          </div>
-        </button>
-      );
-    }
-    return (
-      <button onClick={handleStartCaptureClick}>
-        <div className="h-16 w-16 bg-red-500 rounded-full text-white text-2xl flex justify-center items-center">
-          <FontAwesomeIcon icon={faVideo} />
-        </div>
-      </button>
-    );
-  };
-
-  const ResetButton = ({ disabled }: { disabled: boolean }) => {
-    return (
-      <button onClick={handleResetCaptureClick} disabled={disabled}>
-        <div
-          className={`h-16 w-16 ${
-            disabled ? "bg-gray-500" : "bg-blue-500"
-          } rounded-full text-white text-2xl flex justify-center items-center`}
-        >
-          <FontAwesomeIcon icon={faRedo} />
-        </div>
-      </button>
-    );
-  };
 
   return (
     <div>
@@ -155,21 +125,73 @@ function App() {
           videoConstraints={videoConstraints}
           ref={webcamRef}
         />
-        <div className="z-10 absolute bottom-10 bg-white py-2 px-6 rounded-md w-96 flex flex-row justify-evenly items-center gap-2">
-          <RecordButton
-            capturing={capturing}
-            download={recordedChunks.length > 0}
-          />
-          <ResetButton disabled={recordedChunks.length === 0} />
-          <p className="font-thin text-2xl text-gray-500">
-            <span>{("0" + Math.floor(timeRecording / 3600)).slice(-2)}:</span>
-            <span>
-              {("0" + Math.floor((timeRecording / 60) % 60)).slice(-2)}:
-            </span>
-            <span>{("0" + (timeRecording % 60)).slice(-2)}</span>
-          </p>
-        </div>
+        <Controls
+          isCapturing={capturing}
+          isDoneRecording={isDoneRecording}
+          isPaused={isPaused}
+          handlePause={handlePauseCaptureClick}
+          handlePreview={handlePreview}
+          handleReset={handleResetCaptureClick}
+          handleResume={handleResumeCaptureClick}
+          handleStart={handleStartCaptureClick}
+          handleStop={handleStopCaptureClick}
+          handleUpload={handleUpload}
+          timeRecording={timeRecording}
+          recordedChunks={recordedChunks}
+        />
       </div>
+      <Transition appear show={openPreview} as={Fragment}>
+        <Dialog
+          as="div"
+          className="fixed inset-0 z-10 overflow-y-auto"
+          onClose={() => setOpenPreview(false)}
+        >
+          <div className="min-h-screen px-4 text-center">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0"
+              enterTo="opacity-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100"
+              leaveTo="opacity-0"
+            >
+              <Dialog.Overlay className="fixed inset-0" />
+            </Transition.Child>
+
+            {/* This element is to trick the browser into centering the modal contents. */}
+            <span
+              className="inline-block h-screen align-middle"
+              aria-hidden="true"
+            >
+              &#8203;
+            </span>
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+                <Dialog.Title
+                  as="h3"
+                  className="text-lg font-medium leading-6 text-gray-900"
+                >
+                  Preview video recording
+                </Dialog.Title>
+                <div className="mt-2">
+                  <video width="1280" height="720" controls>
+                    <source src={videoUrl} type="video/webm" />
+                  </video>
+                </div>
+              </div>
+            </Transition.Child>
+          </div>
+        </Dialog>
+      </Transition>
     </div>
   );
 }
