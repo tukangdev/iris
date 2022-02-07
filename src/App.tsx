@@ -1,4 +1,5 @@
 import { Dialog, Transition } from "@headlessui/react";
+import dayjs from "dayjs";
 import React, { Fragment } from "react";
 import { Helmet } from "react-helmet";
 import Webcam from "react-webcam";
@@ -81,7 +82,7 @@ function App() {
       document.body.appendChild(a);
       a.setAttribute("style", "display: none");
       a.href = url;
-      a.download = "react-webcam-stream-capture.webm";
+      a.download = `iris-${dayjs().format("DDMMYYYYHHmm")}.webm`;
       a.click();
       window.URL.revokeObjectURL(url);
       setRecordedChunks([]);

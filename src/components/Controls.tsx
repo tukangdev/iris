@@ -193,7 +193,7 @@ const Controls = ({
   return (
     <div className="gap-2 flex flex-col z-10 justify-center items-center absolute bottom-10">
       <Timer timeRecording={timeRecording} />
-      <div className="z-10 shadow-xl bg-transparent py-2 px-2 rounded-md w-80 flex flex-row justify-center items-center gap-4">
+      <div className="z-10 bg-transparent py-2 px-2 rounded-md w-80 flex flex-row justify-center items-center gap-4">
         <Transition
           show={isDoneRecording}
           enter="transform transition duration-[400ms]"
